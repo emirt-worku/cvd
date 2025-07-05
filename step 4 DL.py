@@ -10,27 +10,18 @@ from sklearn.datasets import make_classification
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Dense, Dropout, BatchNormalization, Conv1D, MaxPooling1D, Flatten, Input, LSTM, Concatenate, Add, Attention
-from sklearn.preprocessing import StandardScaler, MinMaxScaler  # For feature scaling (Standard and Min-Max scaling)
+from sklearn.preprocessing import StandardScaler, MinMaxScaler 
 from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV, RandomizedSearchCV,cross_validate  # For splitting data, cross-validation, and hyperparameter tuning
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix  
 from imblearn.over_sampling import SMOTE  
 from sklearn.linear_model import LogisticRegression  
 from sklearn.neural_network import MLPClassifier 
 from sklearn.svm import SVC 
-from sklearn.ensemble import (
-    RandomForestClassifier, 
-    GradientBoostingClassifier, 
-    AdaBoostClassifier,
-    ExtraTreesClassifier,
-    StackingClassifier, 
-    VotingClassifier
-)
 from xgboost import XGBClassifier
-from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.regularizers import l2
 import shap
-X = df.drop(columns=['HadHeartAttack'])  # Features
-y = df['HadHeartAttack']  # Target variable
+X = df.drop(columns=['HadHeartAttack'])  
+y = df['HadHeartAttack'] 
 X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=0.15, random_state=42, stratify=y)
 X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.1765, random_state=42, stratify=y_train_val)
 scaler = StandardScaler()
