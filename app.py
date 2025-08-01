@@ -198,10 +198,14 @@ optional_fields = {
 
 with st.expander("Show Optional Fields"):
     opt_col1, opt_col2 = st.columns(2)
+    
     for i, (key, label) in enumerate(optional_fields.items()):
         with (opt_col1 if i % 2 == 0 else opt_col2):
-            input_data[key] = st.selectbox(label, ['Yes', 'No'])
-
+            if key in ui_to_le_mapping:
+                options = list(ui_to_le_mapping[key].keys())
+                input_data[key] = st.selectbox(label, options)
+            else:
+                input_data[key] = st.text_input(label, "")
 if st.button("Predict Risk"):
     probability, risk_category = predict_risk(input_data)
     if probability is None:
