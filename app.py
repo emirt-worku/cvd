@@ -63,7 +63,7 @@ ui_to_le_mapping = {
     'DifficultyWalking': {'No': '0',  'Yes': '1','Yes, some difficulty': '1', 'Yes, a lot of difficulty': '2', 'Cannot walk': '3'},
     'DifficultyDressing': {'No': '0',  'Yes': '1','Yes, some difficulty': '1', 'Yes, a lot of difficulty': '2', 'Cannot dress': '3'},
     'DifficultyErrands': {'No': '0',  'Yes': '1','Yes, some difficulty': '1', 'Yes, a lot of difficulty': '2', 'Cannot do errands': '3'},
-    'SmokingStatus': {'Never smoked': '0','Never':'0','Former smoker': '1', 'Current smoker': '2', 'Refused': '3'},
+    'SmokingStatus': {'Never smoked': '0','Never':'0','Former': '1', 'Current': '2', 'Refused': '3'},
     'AgeGroup': {
         '18-24': '0', '25-29': '1', '30-34': '2', '35-39': '3', '40-44': '4',
         '45-49': '5', '50-54': '6', '55-59': '7', '60-64': '8', '65-69': '9',
