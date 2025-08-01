@@ -2,67 +2,137 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+import joblib
 
-mandatory_features = [
-    'Sex', 'AgeCategory', 'SystolicBP', 'DiastolicBP', 'Cholesterol',
-    'BMI', 'SmokerStatus', 'AlcoholDrinkers', 'HadDiabetes',
-    'HadAngina', 'HadStroke', 'PhysicalActivities', 'PrematureFamilyHistory'
-]
+# --------------------------- Configuration ---------------------------
+st.set_page_config(page_title="CVDs Risk Predictor", layout="wide")
 
+# --------------------------- Features ---------------------------
 model_features = [
-    'Sex', 'GeneralHealth', 'PhysicalHealthDays', 'MentalHealthDays',
-    'LastCheckupTime', 'PhysicalActivities', 'SleepHours',
-    'HadAngina', 'HadStroke', 'HadAsthma', 'HadSkinCancer', 'HadCOPD',
-    'HadDepressiveDisorder', 'HadKidneyDisease', 'HadArthritis',
-    'HadDiabetes', 'DeafOrHardOfHearing', 'BlindOrVisionDifficulty',
-    'DifficultyConcentrating', 'DifficultyWalking', 'DifficultyDressingBathing',
-    'DifficultyErrands', 'SmokerStatus', 'ChestScan', 'AgeCategory', 'BMI',
-    'AlcoholDrinkers', 'HIVTesting', 'FluVaxLast12', 'PneumoVaxEver',
-    'TetanusLast10Tdap', 'HighRiskLastYear', 'CovidPos', 'SystolicBP',
-    'DiastolicBP', 'Cholesterol', 'PrematureFamilyHistory'
+   'PhysicalHealthDays', 'MentalHealthDays', 'DrinksPerDay', 'Sex',
+   'GeneralHealth', 'LastCheckupTime', 'PhysicalActivity',
+   'HadStroke', 'HadAsthma', 'HadSkinCancer', 'HadOtherCancer',
+   'HadCOPD', 'HadDepressiveDisorder', 'HadKidneyDisease', 'HadArthritis',
+   'HadDiabetes', 'DifficultyHearing', 'DifficultySeeing',
+   'DifficultyMakingDecisions', 'DifficultyWalking', 'DifficultyDressing',
+   'DifficultyErrands', 'SmokingStatus', 'AgeGroup', 'BMICategory',
+   'EverTestedHIV', 'ReceivedFluVax', 'EverHadPneumoniaVax',
+   'EverHadCOVID', 'HighBloodPressure', 'CholesterolCheck5yrs',
+   'EverToldCHD', 'CalculatedCHD', 'HeavyDrinking', 'Smoked100Cigarettes',
+   'CurrentlySmoke'
 ]
 
-categorical_inputs = [
-    'Sex', 'GeneralHealth', 'SmokerStatus', 'AlcoholDrinkers',
-    'ChestScan', 'AgeCategory', 'HIVTesting', 'FluVaxLast12',
-    'PneumoVaxEver', 'TetanusLast10Tdap', 'HighRiskLastYear', 'CovidPos',
-    'LastCheckupTime'
-]
-def preprocess_input(input_dict, feature_list):
-    df = pd.DataFrame([input_dict])[feature_list]
-    for col in df.select_dtypes(include='object').columns:
-        le = LabelEncoder()
-        df[col] = le.fit_transform(df[col].astype(str))
-    scaler = StandardScaler()
-    df_scaled = scaler.fit_transform(df)
-    return df_scaled
+@st.cache_resource
+def load_artifacts():
+    label_encoders = joblib.load("label_encoders.pkl")
+    scaler = joblib.load("scaler.pkl")
+    model = tf.keras.models.load_model("FNN.h5")
+    return label_encoders, scaler, model
 
-def predict_risk(input_data):
-    model_path = "heart_attack_model.h5"
-    try:
-        input_processed = preprocess_input(input_data, model_features)
-    except KeyError as e:
-        return None, f"⚠️ Missing required feature: {str(e)}"
+label_encoders, scaler, model = load_artifacts()
 
-    model = tf.keras.models.load_model(model_path)
-    probability = model.predict(input_processed)[0][0]
+# --- Mapping from UI labels to the exact classes expected by the LabelEncoders ---
 
-    if probability < 0.33:
-        risk = "Low"
-    elif probability < 0.66:
-        risk = "Medium"
+# Example: Your UI shows ['Male', 'Female'], but your LabelEncoder classes may be ['Female', 'Male']
+# So to ensure proper encoding, build reverse lookup dicts for these inputs:
+
+ui_to_le_mapping = {
+    'Sex': {'Female': '0', 'Male': '1'},
+    'GeneralHealth': {
+        'Excellent': '0', 'Very Good': '1', 'Good': '2', 'Fair': '3', 'Poor': '4',
+        'Unknown': '5', 'Refused': '6'  # Adjust if you have these extra classes
+    },
+    'LastCheckupTime': {
+        '<1 year': '0', '1-2 years': '1', '2-5 years': '2', '5+ years': '3',
+        'Never': '4', 'Refused': '5'  # Adjust if needed
+    },
+    'PhysicalActivity': {'Yes': '0', 'No': '1', 'Refused': '2', 'Unknown': '3'},
+    'HadStroke': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'HadAsthma': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'HadSkinCancer': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'HadOtherCancer': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'HadCOPD': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'HadDepressiveDisorder': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'HadKidneyDisease': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'HadArthritis': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'HadDiabetes': {'No': '0', 'Yes': '1', 'Borderline': '2', 'DuringPregnancy': '3', 'Refused': '4', 'Unknown': '5'},
+    'DifficultyHearing': {'No': '0', 'Yes': '1', 'Yes, some difficulty': '1', 'Yes, a lot of difficulty': '2', 'Deaf': '3'},
+
+'DifficultySeeing': {'No': '0', 'Yes': '1', 'Yes, some difficulty': '1', 'Yes, a lot of difficulty': '2', 'Blind': '3'},
+    'DifficultyMakingDecisions': {'No': '0', 'Yes': '1', 'Yes, some difficulty': '1', 'Yes, a lot of difficulty': '2', 'Cannot make decisions': '3'},
+    'DifficultyWalking': {'No': '0',  'Yes': '1','Yes, some difficulty': '1', 'Yes, a lot of difficulty': '2', 'Cannot walk': '3'},
+    'DifficultyDressing': {'No': '0',  'Yes': '1','Yes, some difficulty': '1', 'Yes, a lot of difficulty': '2', 'Cannot dress': '3'},
+    'DifficultyErrands': {'No': '0',  'Yes': '1','Yes, some difficulty': '1', 'Yes, a lot of difficulty': '2', 'Cannot do errands': '3'},
+    'SmokingStatus': {'Never smoked': '0','Never':'0','Former smoker': '1', 'Current smoker': '2', 'Refused': '3'},
+    'AgeGroup': {
+        '18-24': '0', '25-29': '1', '30-34': '2', '35-39': '3', '40-44': '4',
+        '45-49': '5', '50-54': '6', '55-59': '7', '60-64': '8', '65-69': '9',
+        '70-74': '10', '75-79': '11', '80+': '12'
+    },
+    'BMICategory': {'Underweight': '0', 'Normal weight': '1', 'Overweight': '2', 'Obese': '3'},
+    'EverTestedHIV': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'ReceivedFluVax': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'EverHadPneumoniaVax': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'EverHadCOVID': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'HighBloodPressure': {'No': '0', 'Yes': '1'},
+    'CholesterolCheck5yrs': {'No': '0', 'Yes': '1'},
+    'EverToldCHD': {'No': '0', 'Yes': '1', 'Refused': '2', 'Unknown': '3'},
+    'CalculatedCHD': {'No': '0', 'Yes': '1'},
+    'HeavyDrinking': {'No': '0', 'Yes': '1'},
+    'Smoked100Cigarettes': {'No': '0', 'Yes': '1'},
+    'CurrentlySmoke': {'Never smoked': '0', 'Former smoker': '1', 'Current smoker': '2', 'Yes': '3', 'No': '4'}
+}
+
+
+def safe_transform(le, val, col):
+    """
+    Safely transform user input val using label encoder le.
+    Maps UI label to LabelEncoder class if mapping exists.
+    """
+    # Map UI label to encoder label
+    if col in ui_to_le_mapping:
+        val_mapped = ui_to_le_mapping[col].get(val, None)
+        if val_mapped is None:
+            st.error(f"❌ Invalid input '{val}' for '{col}'")
+            st.stop()
     else:
-        risk = "High"
+        val_mapped = val  # no mapping, use as is
 
-    return probability, risk
-# Start of your GUI
+    if val_mapped in le.classes_:
+        return le.transform([val_mapped])[0]
+
+    st.error(f"❌ Unseen label '{val_mapped}' for feature '{col}'")
+    st.stop()
+
+def encode_and_scale_input(input_dict):
+    df = pd.DataFrame([{k: input_dict.get(k, np.nan) for k in model_features}])
+
+    for col, le in label_encoders.items():
+        if col in df.columns:
+            df[col] = df[col].astype(str).apply(lambda v: safe_transform(le, v, col))
+
+    st.write("Encoded & ready for scaling input:")
+    st.write(df)
+
+    X_scaled = scaler.transform(df)
+    return X_scaled
 
 
-st.set_page_config(page_title="CVDs Risk predictor", layout="wide")
-st.title("💓 CVDs Risk Predictor")
-st.markdown("Fill out the following health information to estimate your heart attack risk.")
-# Custom layout with two images on left and right, and centered title/email
+def predict_risk(input_dict):
+    try:
+        X = encode_and_scale_input(input_dict)
+        prob = model.predict(X)[0][0]
+        if prob < 0.33:
+            risk = "Low"
+        elif prob < 0.66:
+            risk = "Medium"
+        else:
+            risk = "High"
+        return prob, risk
+    except Exception as e:
+        return None, str(e)
+
+# --------------------------- Layout with Images ---------------------------
 left_col, center_col, right_col = st.columns([1, 4, 1])
 
 with left_col:
@@ -75,77 +145,68 @@ with center_col:
 
 with right_col:
     st.image("right_image.png", width=100)
-# Mandatory features — Column 1 and 2
-col1, col2, col3, col4 = st.columns(4)
+
 input_data = {}
+col1, col2, col3, col4 = st.columns(4)
+
 with col1:
     input_data['Sex'] = st.selectbox("Sex", ['Male', 'Female'])
-    input_data['AgeCategory'] = st.selectbox("Age Category", [
-        '18-24', '25-29', '30-34', '35-39', '40-44', '45-49',
-        '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80+'
-    ])
-    input_data['SystolicBP'] = st.number_input("Systolic Blood Pressure", 80, 250, 120)
-    input_data['DiastolicBP'] = st.number_input("Diastolic Blood Pressure", 40, 150, 80)
+    input_data['AgeGroup'] = st.selectbox("Age Group", ['18-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80+'])
+    input_data['PhysicalHealthDays'] = st.number_input("Physical Health Days", 0, 30, 0)
+    input_data['MentalHealthDays'] = st.number_input("Mental Health Days", 0, 30, 0)
 
 with col2:
-    input_data['Cholesterol'] = st.number_input("Cholesterol (mg/dL)", 100, 400, 200)
-    input_data['BMI'] = st.number_input("Body Mass Index", 10.0, 60.0, 24.0)
-    input_data['SmokerStatus'] = st.selectbox("smoker status", ['Former smoker' ,'Never smoked' ,'Current smoker - now smokes every day',
- 'Current smoker - now smokes some days'])
-    input_data['AlcoholDrinkers'] = st.selectbox("Do you drink alcohol?", ['Yes', 'No'])
+    input_data['DrinksPerDay'] = st.number_input("Drinks Per Day", 0.0, 20.0, 0.0)
+    input_data['GeneralHealth'] = st.selectbox("General Health", ['Excellent', 'Very Good', 'Good', 'Fair', 'Poor'])
+    input_data['LastCheckupTime'] = st.selectbox("Last Checkup Time", ['<1 year', '1-2 years', '2-5 years', '5+ years'])
+    input_data['PhysicalActivity'] = st.selectbox("Physical Activity", ['Yes', 'No'])
 
 with col3:
-    input_data['HadDiabetes'] = st.selectbox("Do you have diabetes?", ['Yes', 'No'])
-    input_data['HadAngina'] = st.selectbox("Have you had angina?", ['Yes', 'No'])
-    input_data['HadStroke'] = st.selectbox("Have you had a stroke?", ['Yes', 'No'])
-    input_data['PhysicalActivities'] = st.selectbox("Do you exercise regularly?", ['Yes', 'No'])
+    input_data['BMICategory'] = st.selectbox("BMI Category", ['Underweight', 'Normal', 'Overweight', 'Obese'])
+    input_data['SmokingStatus'] = st.selectbox("Smoking Status", ['Never', 'Former', 'Current'])
+    input_data['EverTestedHIV'] = st.selectbox("Ever Tested HIV", ['Yes', 'No'])
 
 with col4:
-    input_data['PrematureFamilyHistory'] = st.selectbox("Family history of early heart disease?", ['Yes', 'No'])
-
-    # ✅ Optional Fields
-    input_data['GeneralHealth'] = st.selectbox("General Health", ['Excellent', 'Very Good', 'Good', 'Fair', 'Poor'])
-    input_data['MentalHealthDays'] = st.number_input("Mental Health (days/month)", 0, 30, 0)
-    input_data['PhysicalHealthDays'] = st.number_input("Physical Health (days/month)", 0, 30, 0)
-    input_data['SleepHours'] = st.number_input("Average Sleep Hours", 0, 24, 7)
-    input_data['LastCheckupTime'] = st.selectbox("LastCheckupTime", [ 'Within past year (anytime less than 12 months ago)',
-    'Within past 2 years (1 year but less than 2 years ago)','Within past 5 years (2 years but less than 5 years ago)','5 or more years ago'])
-# More optional inputs (added here but not mandatory)
+    input_data['EverHadCOVID'] = st.selectbox("Ever Had COVID-19", ['Yes', 'No'])
+    input_data['HighBloodPressure'] = st.selectbox("High Blood Pressure", ['Yes', 'No'])
+    input_data['CholesterolCheck5yrs'] = st.selectbox("Cholesterol Check in 5 Yrs", ['Yes', 'No'])
+    input_data['EverToldCHD'] = st.selectbox("Ever Told CHD", ['Yes', 'No'])
 
 optional_fields = {
-    'HadAsthma': "Do you have asthma?",
-    'HadSkinCancer': "Do you have skin cancer?",
-    'HadCOPD': "Do you have COPD?",
-    'HadDepressiveDisorder': "Depressive disorder?",
-    'HadKidneyDisease': "Kidney disease?",
-    'HadArthritis': "Arthritis?",
-    'DeafOrHardOfHearing': "Deaf or hearing difficulty?",
-    'BlindOrVisionDifficulty': "Vision difficulty?",
-    'DifficultyConcentrating': "Difficulty concentrating?",
-    'DifficultyWalking': "Difficulty walking?",
-    'DifficultyDressingBathing': "Difficulty dressing/bathing?",
-    'DifficultyErrands': "Difficulty doing errands?",
-    'ChestScan': "Had chest scan recently?",
-    'HIVTesting': "Ever tested for HIV?",
-    'FluVaxLast12': "Got flu vaccine in past year?",
-    'PneumoVaxEver': "Ever had pneumococcal vaccine?",
-    'TetanusLast10Tdap': "Had Tetanus/Tdap in past 10 yrs?",
-    'HighRiskLastYear': "High risk behavior last year?",
-    'CovidPos': "Ever tested COVID-19 positive?"
+    'HadStroke': "Had Stroke?",
+    'HadAsthma': "Had Asthma?",
+    'HadSkinCancer': "Had Skin Cancer?",
+    'HadOtherCancer': "Had Other Cancer?",
+    'HadCOPD': "Had COPD?",
+    'HadDepressiveDisorder': "Had Depressive Disorder?",
+    'HadKidneyDisease': "Had Kidney Disease?",
+    'HadArthritis': "Had Arthritis?",
+    'HadDiabetes': "Had Diabetes?",
+    'DifficultyHearing': "Difficulty Hearing?",
+    'DifficultySeeing': "Difficulty Seeing?",
+    'DifficultyMakingDecisions': "Difficulty Making Decisions?",
+    'DifficultyWalking': "Difficulty Walking?",
+    'DifficultyDressing': "Difficulty Dressing?",
+    'DifficultyErrands': "Difficulty Doing Errands?",
+    'ReceivedFluVax': "Received Flu Vaccine?",
+    'EverHadPneumoniaVax': "Ever Had Pneumonia Vaccine?",
+    'CalculatedCHD': "Calculated CHD?",
+    'HeavyDrinking': "Heavy Drinking?",
+    'Smoked100Cigarettes': "Smoked 100 Cigarettes?",
+    'CurrentlySmoke': "Currently Smoke?"
 }
-with st.expander("➕ Show Optional Fields"):
+
+with st.expander("Show Optional Fields"):
     opt_col1, opt_col2 = st.columns(2)
     for i, (key, label) in enumerate(optional_fields.items()):
         with (opt_col1 if i % 2 == 0 else opt_col2):
             input_data[key] = st.selectbox(label, ['Yes', 'No'])
 
-# Predict button
-if st.button("🧠 Predict Risk"):
+if st.button("Predict Risk"):
     probability, risk_category = predict_risk(input_data)
-
     if probability is None:
-        st.error(risk_category)
+        st.error(f"❌ Prediction error: {risk_category}")
     else:
         st.success(f"Risk Score: **{probability:.2f}**")
-        st.markdown(f"### 🚦 Risk Level: **{risk_category.upper()}**")
+        st.markdown(f"Risk Level: **{risk_category.upper()}**")
         st.progress(min(int(probability * 100), 100))
