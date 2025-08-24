@@ -5,7 +5,7 @@ import tensorflow as tf
 import joblib
 
 # --------------------------- Configuration ---------------------------
-st.set_page_config(page_title="CVDs Risk Predictor", layout="wide")
+st.set_page_config(page_title="Heart Attack Risk Predictor", layout="wide")
 
 # --------------------------- Features ---------------------------
 model_features = [
@@ -139,7 +139,7 @@ with left_col:
     st.image("left_image.png", width=100)
 
 with center_col:
-    st.markdown("<h1 style='text-align: center;'>💓 CVDs Risk Predictor</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>💓 Heart Attack Risk Predictor</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center;'>Fill out the following health information to estimate your heart attack risk.</p>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center;'><b>Contact:</b> <a href='mailto:emirt.worku99@email.com'>emirt.worku99@gmail.com</a></p>", unsafe_allow_html=True)
 
